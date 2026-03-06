@@ -18,44 +18,46 @@ c = conn.cursor()
 c.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0)')
 conn.commit()
 
+# --- LOAD SERVICES ---
 try:
     with open('services.json', 'r') as f: services = json.load(f)
 except: services = {"instagram": [], "youtube": [], "telegram": []}
 
+# --- RENDER PORT BINDING ---
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Bot is Online!"
+def home(): return "Bot is Live!"
 def run_flask(): app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
 # --- HELPERS ---
-async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def is_subscribed(update, context):
     try:
         member = await context.bot.get_chat_member(CHANNEL, update.effective_user.id)
         return member.status in ['member', 'administrator', 'creator']
     except: return False
 
 # --- HANDLERS ---
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def start(update, context):
     if not await is_subscribed(update, context):
         kb = [[InlineKeyboardButton("Join Channel 📢", url=f"https://t.me/{CHANNEL.strip('@')}")]]
-        return await update.message.reply_text("❌ **Join Channel First!**", reply_markup=InlineKeyboardMarkup(kb))
+        return await update.message.reply_text("❌ **Access Denied!**\nPehle channel join karein.", reply_markup=InlineKeyboardMarkup(kb))
     
     kb = [["SERVICES", "ADD FUND"], ["MY ACCOUNT", "SUPPORT"]]
-    await update.message.reply_text("🔥 **SMM PANEL ACTIVE**", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+    await update.message.reply_text("🔥 **Welcome to SMM Panel**", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
-async def my_account(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def my_account(update, context):
     c.execute("SELECT balance FROM users WHERE user_id=?", (update.effective_user.id,))
     res = c.fetchone()
     bal = res[0] if res else 0
-    await update.message.reply_text(f"👤 ID: `{update.effective_user.id}`\n💰 Balance: {bal} RS", parse_mode='Markdown')
+    await update.message.reply_text(f"👤 **User ID:** `{update.effective_user.id}`\n💰 **Balance:** {bal} RS", parse_mode='Markdown')
 
-async def handle_services(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_services(update, context):
     kb = [[InlineKeyboardButton("Instagram", callback_data="cat_instagram")],
           [InlineKeyboardButton("YouTube", callback_data="cat_youtube")],
           [InlineKeyboardButton("Telegram", callback_data="cat_telegram")]]
     await update.message.reply_text("Select Category:", reply_markup=InlineKeyboardMarkup(kb))
 
-async def cat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cat_callback(update, context):
     query = update.callback_query
     await query.answer()
     cat = query.data.split("_")[1]
@@ -64,25 +66,27 @@ async def cat_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg += f"🆔 `{s['id']}` - {s['name']}\n💵 {s['price_per_1000']} RS/1k\n\n"
     await query.message.reply_text(msg + "Format: `/order [id] [link] [qty]`", parse_mode='Markdown')
 
-async def order(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- SMART ORDER (Fixed Response Error) ---
+async def order(update, context):
     if len(context.args) < 3:
         return await update.message.reply_text("❌ Usage: `/order [id] [link] [qty]`")
     try:
         sid, link, qty = int(context.args[0]), str(context.args[1]), int(context.args[2])
         found = next((s for cat in services.values() for s in cat if s['id'] == sid), None)
-        if not found: return await update.message.reply_text("❌ Invalid ID!")
+        if not found: return await update.message.reply_text("❌ Invalid Service ID!")
 
         total = (found['price_per_1000'] / 1000) * qty
         c.execute("SELECT balance FROM users WHERE user_id=?", (update.effective_user.id,))
         bal = (c.fetchone() or (0,))[0]
-        if bal < total: return await update.message.reply_text(f"❌ Low Balance! Cost: {total}")
+        if bal < total: return await update.message.reply_text(f"❌ Low Balance! Cost: {total} RS")
 
-        # --- SMART API CALL WITH ERROR HANDLING ---
+        # API Call
+        payload = {'key': API_KEY, 'action': 'add', 'service': sid, 'link': link, 'quantity': qty}
         try:
-            r = requests.post(API_URL, data={'key': API_KEY, 'action': 'add', 'service': sid, 'link': link, 'quantity': qty}, timeout=10)
-            resp = r.json() # Yahan error aati thi agar API down ho
+            r = requests.post(API_URL, data=payload, timeout=15)
+            resp = r.json()
         except:
-            return await update.message.reply_text("❌ **API Error:** Panel response nahi de raha. Thodi der baad try karein.")
+            return await update.message.reply_text("❌ **API Error:** Panel response nahi de raha.")
 
         if 'order' in resp:
             c.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (total, update.effective_user.id))
@@ -90,40 +94,40 @@ async def order(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"✅ Order Placed! ID: {resp['order']}")
         else:
             await update.message.reply_text(f"❌ Panel Error: {resp.get('error', 'Unknown Error')}")
-    except Exception as e:
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+    except: await update.message.reply_text("❌ Error: Check ID/Link/Qty format.")
 
-# --- CONVERSATION ---
-async def add_fund_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("💳 UPI: `vansh59rt@fam`", 
-                                   reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SEND SS ✅", callback_data="ask_ss")]]), parse_mode='Markdown')
-    return WAITING_FOR_SS
-
-async def ask_ss(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.answer()
-    await update.callback_query.edit_message_text("📸 Send Screenshot now:")
-    return WAITING_FOR_SS
-
-async def receive_ss(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message.photo:
-        return await update.message.reply_text("❌ Please send an image/photo only.")
-    photo = update.message.photo[-1].file_id
-    admin_kb = [[InlineKeyboardButton("Approve ✅", callback_data=f"app_{update.effective_user.id}")]]
-    await context.bot.send_photo(ADMIN_ID, photo, caption=f"Deposit Request: `{update.effective_user.id}`", reply_markup=InlineKeyboardMarkup(admin_kb))
-    await update.message.reply_text("✅ Sent to admin!")
-    return ConversationHandler.END
-
-async def admin_add(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- ADMIN COMMANDS ---
+async def admin_add(update, context):
     if update.effective_user.id != ADMIN_ID: return
     try:
+        # Sahi Sequence: /add [user_id] [amount]
         uid, amt = int(context.args[0]), float(context.args[1])
         c.execute("INSERT OR IGNORE INTO users (user_id, balance) VALUES (?, 0)", (uid,))
         c.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amt, uid))
         conn.commit()
         await update.message.reply_text(f"✅ Added {amt} to {uid}")
-    except: await update.message.reply_text("Usage: /add [id] [amt]")
+    except: await update.message.reply_text("Usage: `/add [user_id] [amount]`")
 
-async def approve_cb(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# --- CONVERSATION ---
+async def add_fund_start(update, context):
+    await update.message.reply_text("💳 UPI: `vansh59rt@fam`", 
+                                   reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SEND SS ✅", callback_data="ask_ss")]]))
+    return WAITING_FOR_SS
+
+async def ask_ss(update, context):
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text("📸 Send Screenshot now:")
+    return WAITING_FOR_SS
+
+async def receive_ss(update, context):
+    if not update.message.photo: return await update.message.reply_text("❌ Send image only.")
+    photo = update.message.photo[-1].file_id
+    admin_kb = [[InlineKeyboardButton("Approve ✅", callback_data=f"app_{update.effective_user.id}")]]
+    await context.bot.send_photo(ADMIN_ID, photo, caption=f"Deposit: `{update.effective_user.id}`", reply_markup=InlineKeyboardMarkup(admin_kb))
+    await update.message.reply_text("✅ Sent to admin!")
+    return ConversationHandler.END
+
+async def approve_cb(update, context):
     await update.callback_query.answer()
     uid = int(update.callback_query.data.split("_")[1])
     c.execute("INSERT OR IGNORE INTO users (user_id, balance) VALUES (?, 0)", (uid,))
@@ -137,13 +141,11 @@ if __name__ == '__main__':
     threading.Thread(target=run_flask).start()
     bot = ApplicationBuilder().token(TOKEN).build()
     
-    # per_message warning fixed (Set to False for MessageHandlers)
     conv = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex("^ADD FUND$"), add_fund_start)],
-        states={WAITING_FOR_SS: [CallbackQueryHandler(ask_ss, pattern="^ask_ss$"), 
-                                 MessageHandler(filters.PHOTO, receive_ss)]},
+        states={WAITING_FOR_SS: [CallbackQueryHandler(ask_ss, pattern="^ask_ss$"), MessageHandler(filters.PHOTO, receive_ss)]},
         fallbacks=[],
-        per_message=False 
+        per_chat=True
     )
 
     bot.add_handler(CommandHandler("start", start))
