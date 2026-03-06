@@ -1,16 +1,39 @@
 import json
+import os
+import threading
+from flask import Flask
 from telegram import *
 from telegram.ext import *
 from config import *
 
+# ---------- FLASK SERVER (RENDER PORT FIX) ----------
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "SMM Bot Running"
+
+
+def run():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+
+def keep_alive():
+    t = threading.Thread(target=run)
+    t.start()
+
+# ---------- LOAD SERVICES ----------
+
 with open("services.json") as f:
-    services=json.load(f)
+    services = json.load(f)
 
 try:
     with open("database.json") as f:
-        db=json.load(f)
+        db = json.load(f)
 except:
-    db={"users":{}}
+    db = {"users": {}}
 
 
 def save():
@@ -26,6 +49,8 @@ def get_user(uid):
     return db["users"][uid]
 
 
+# ---------- MAIN MENU ----------
+
 def main_menu():
 
     keyboard=[
@@ -38,13 +63,17 @@ def main_menu():
     return InlineKeyboardMarkup(keyboard)
 
 
+# ---------- START ----------
+
 async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-        "Welcome to SMM Bot 🚀",
+        "🚀 Welcome to SMM Bot",
         reply_markup=main_menu()
     )
 
+
+# ---------- BUTTON HANDLER ----------
 
 async def button(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
@@ -63,7 +92,7 @@ async def button(update:Update,context:ContextTypes.DEFAULT_TYPE):
         ]
 
         await query.message.edit_text(
-            f"Send payment to UPI:\n\n{UPI_ID}",
+            f"Send payment to:\n\nUPI: {UPI_ID}",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
@@ -130,7 +159,7 @@ async def button(update:Update,context:ContextTypes.DEFAULT_TYPE):
         user=get_user(uid)
 
         await query.message.edit_text(
-            f"👤 Your Account\n\nBalance: ₹{user['balance']}",
+            f"👤 Account\n\nBalance: ₹{user['balance']}",
             reply_markup=main_menu()
         )
 
@@ -146,10 +175,12 @@ async def button(update:Update,context:ContextTypes.DEFAULT_TYPE):
     elif data=="back":
 
         await query.message.edit_text(
-            "Welcome to SMM Bot 🚀",
+            "🚀 Welcome to SMM Bot",
             reply_markup=main_menu()
         )
 
+
+# ---------- MESSAGE HANDLER ----------
 
 async def message(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
@@ -184,14 +215,14 @@ async def message(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
         if user["balance"] < price:
 
-            await update.message.reply_text("Insufficient Balance")
+            await update.message.reply_text("❌ Insufficient Balance")
             return
 
 
         user["balance"] -= price
 
 
-        order_text=f"""
+        order=f"""
 🚨 NEW ORDER
 
 User: {uid}
@@ -206,14 +237,13 @@ Quantity: {qty}
 Price: ₹{price}
 """
 
-
         await context.bot.send_message(
             ORDER_CHANNEL,
-            order_text
+            order
         )
 
 
-        user["orders"].append(order_text)
+        user["orders"].append(order)
 
         save()
 
@@ -223,6 +253,8 @@ Price: ₹{price}
 
         context.user_data.clear()
 
+
+# ---------- PAYMENT SCREENSHOT ----------
 
 async def photo(update:Update,context:ContextTypes.DEFAULT_TYPE):
 
@@ -248,19 +280,21 @@ async def photo(update:Update,context:ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Payment sent for approval")
 
 
+# ---------- MAIN ----------
+
 def main():
 
-    app=Application.builder().token(BOT_TOKEN).build()
+    keep_alive()
 
-    app.add_handler(CommandHandler("start",start))
+    app_bot = Application.builder().token(BOT_TOKEN).build()
 
-    app.add_handler(CallbackQueryHandler(button))
+    app_bot.add_handler(CommandHandler("start",start))
+    app_bot.add_handler(CallbackQueryHandler(button))
+    app_bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,message))
+    app_bot.add_handler(MessageHandler(filters.PHOTO,photo))
 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,message))
-
-    app.add_handler(MessageHandler(filters.PHOTO,photo))
-
-    app.run_polling()
+    app_bot.run_polling()
 
 
 main()
+
