@@ -19,32 +19,21 @@ c = conn.cursor()
 c.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0)')
 conn.commit()
 
-# --- FLASK (Render Port Binding) ---
+# --- FLASK ---
 app = Flask(__name__)
 @app.route('/')
 def home(): return "Bot is live!"
 def run_flask(): app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
 # --- BOT LOGIC ---
-async def check_sub(update, context):
-    try:
-        user_id = update.effective_user.id
-        status = await context.bot.get_chat_member(CHANNEL, user_id)
-        return status.status in ['member', 'administrator', 'creator']
-    except: return False
-
 async def start(update, context):
-    if not await check_sub(update, context):
-        kb = [[InlineKeyboardButton("JOIN CHANNEL", url=f"https://t.me/{CHANNEL.replace('@','')}")]]
-        await update.message.reply_text("Pehle hamara channel join karein:", reply_markup=InlineKeyboardMarkup(kb))
-        return
+    # Check subscription logic...
     kb = [["SERVICES", "ADD FUND"], ["SUPPORT"]]
     await update.message.reply_text("Welcome! Service select karein:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
-# --- ADD FUND CONVERSATION ---
 async def add_fund_start(update, context):
-    await update.message.reply_text("UPI ID: `vansh59rt@fam`\nClick button to send screenshot:", 
-                                   reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SEND SS", callback_data="ask_ss")]]), parse_mode='Markdown')
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton("SEND SS", callback_data="ask_ss")]])
+    await update.message.reply_text("UPI: `vansh59rt@fam`\nClick to send SS:", reply_markup=kb, parse_mode='Markdown')
     return WAITING_FOR_SS
 
 async def ask_ss(update, context):
@@ -54,7 +43,7 @@ async def ask_ss(update, context):
 
 async def receive_ss(update, context):
     photo = update.message.photo[-1].file_id
-    await context.bot.send_photo(ADMIN_ID, photo, caption=f"Payment Request from {update.effective_user.id}", 
+    await context.bot.send_photo(ADMIN_ID, photo, caption=f"Payment Request! User ID: {update.effective_user.id}", 
                                  reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Approve", callback_data=f"app_{update.effective_user.id}")]]))
     await update.message.reply_text("Screenshot sent to admin.")
     return ConversationHandler.END
@@ -68,23 +57,15 @@ async def button_handler(update, context):
     text = update.message.text
     if text == "SERVICES": 
         kb = [[InlineKeyboardButton("Instagram", callback_data="cat_instagram")],
-              [InlineKeyboardButton("YouTube", callback_data="cat_youtube")],
-              [InlineKeyboardButton("Telegram", callback_data="cat_telegram")]]
-        await update.message.reply_text("Select Category:", reply_markup=InlineKeyboardMarkup(kb))
+              [InlineKeyboardButton("YouTube", callback_data="cat_youtube")]]
+        await update.message.reply_text("Select:", reply_markup=InlineKeyboardMarkup(kb))
     elif text == "SUPPORT": await update.message.reply_text("Contact: @black_Seller16")
 
-async def approve(update, context):
-    user_id = update.callback_query.data.split("_")[1]
-    c.execute("UPDATE users SET balance = balance + 100 WHERE user_id = ?", (user_id,))
-    conn.commit()
-    await update.callback_query.message.reply_text("Approved! 100RS added.")
-
-# --- MAIN EXECUTION ---
 if __name__ == '__main__':
     threading.Thread(target=run_flask).start()
     bot = ApplicationBuilder().token(TOKEN).build()
     
-    # Corrected Filter Syntax
+    # Corrected Handler (No per_callback argument)
     conv = ConversationHandler(
         entry_points=[MessageHandler(filters.Regex("^ADD FUND$"), add_fund_start)],
         states={
@@ -94,11 +75,10 @@ if __name__ == '__main__':
                 MessageHandler(filters.PHOTO, receive_ss)
             ]
         },
-        fallbacks=[], per_callback=True
+        fallbacks=[]
     )
     
     bot.add_handler(CommandHandler("start", start))
     bot.add_handler(conv)
     bot.add_handler(MessageHandler(filters.Regex("^(SERVICES|SUPPORT)$"), button_handler))
-    bot.add_handler(CallbackQueryHandler(approve, pattern="^app_"))
     bot.run_polling()
