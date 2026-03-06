@@ -1,6 +1,6 @@
 BOT_TOKEN = "8677165936:AAFxV_wPDgmBt6iyniA9qbmtA9cxnQzDgeE"
 
-ADMIN_ID = 123456789
+ADMIN_ID = 7117775366
 
 UPI_ID = "vansh59rt@fam"
 
