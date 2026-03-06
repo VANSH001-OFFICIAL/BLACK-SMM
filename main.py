@@ -19,13 +19,13 @@ c = conn.cursor()
 c.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0)')
 conn.commit()
 
-# --- FLASK ---
+# --- FLASK (Render Port Binding) ---
 app = Flask(__name__)
 @app.route('/')
 def home(): return "Bot is live!"
 def run_flask(): app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
-# --- HELPERS ---
+# --- BOT LOGIC ---
 async def check_sub(update, context):
     try:
         user_id = update.effective_user.id
@@ -41,9 +41,9 @@ async def start(update, context):
     kb = [["SERVICES", "ADD FUND"], ["SUPPORT"]]
     await update.message.reply_text("Welcome! Service select karein:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
-# --- CONVERSATION HANDLER (ADD FUND) ---
+# --- ADD FUND CONVERSATION ---
 async def add_fund_start(update, context):
-    await update.message.reply_text("UPI: `vansh59rt@fam`\nClick below to send SS:", 
+    await update.message.reply_text("UPI ID: `vansh59rt@fam`\nClick button to send screenshot:", 
                                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("SEND SS", callback_data="ask_ss")]]), parse_mode='Markdown')
     return WAITING_FOR_SS
 
@@ -77,21 +77,28 @@ async def approve(update, context):
     user_id = update.callback_query.data.split("_")[1]
     c.execute("UPDATE users SET balance = balance + 100 WHERE user_id = ?", (user_id,))
     conn.commit()
-    await update.callback_query.message.reply_text("Approved!")
+    await update.callback_query.message.reply_text("Approved! 100RS added.")
 
-# --- EXECUTION ---
+# --- MAIN EXECUTION ---
 if __name__ == '__main__':
     threading.Thread(target=run_flask).start()
     bot = ApplicationBuilder().token(TOKEN).build()
     
+    # Corrected Filter Syntax
     conv = ConversationHandler(
-        entry_points=[MessageHandler(filters.Text(["ADD FUND"]), add_fund_start)],
-        states={WAITING_FOR_SS: [CallbackQueryHandler(ask_ss, pattern="ask_ss"), CallbackQueryHandler(cancel_ss, pattern="cancel_ss"), MessageHandler(filters.PHOTO, receive_ss)]},
+        entry_points=[MessageHandler(filters.Regex("^ADD FUND$"), add_fund_start)],
+        states={
+            WAITING_FOR_SS: [
+                CallbackQueryHandler(ask_ss, pattern="^ask_ss$"),
+                CallbackQueryHandler(cancel_ss, pattern="^cancel_ss$"),
+                MessageHandler(filters.PHOTO, receive_ss)
+            ]
+        },
         fallbacks=[], per_callback=True
     )
     
     bot.add_handler(CommandHandler("start", start))
     bot.add_handler(conv)
-    bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, button_handler))
+    bot.add_handler(MessageHandler(filters.Regex("^(SERVICES|SUPPORT)$"), button_handler))
     bot.add_handler(CallbackQueryHandler(approve, pattern="^app_"))
     bot.run_polling()
