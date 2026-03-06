@@ -358,6 +358,49 @@ async def account(update:Update,context:ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(
         f"User: {uid}\nBalance: ₹{bal}"
     )
+    
+    async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    try:
+        uid = int(context.args[0])
+        amount = int(context.args[1])
+    except:
+        await update.message.reply_text("Usage:\n/addbalance USERID AMOUNT")
+        return
+
+    if uid not in users:
+        users[uid] = {"balance": 0}
+
+    users[uid]["balance"] += amount
+
+    await update.message.reply_text(
+        f"✅ Balance Added\nUser: {uid}\nAmount: ₹{amount}"
+    )
+
+async def remove_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if update.effective_user.id != ADMIN_ID:
+        return
+
+    try:
+        uid = int(context.args[0])
+        amount = int(context.args[1])
+    except:
+        await update.message.reply_text("Usage:\n/removebalance USERID AMOUNT")
+        return
+
+    if uid not in users:
+        users[uid] = {"balance": 0}
+
+    users[uid]["balance"] -= amount
+
+    await update.message.reply_text(
+        f"❌ Balance Removed\nUser: {uid}\nAmount: ₹{amount}"
+    )
+
 
 # ---------------- MAIN ---------------- #
 
@@ -376,6 +419,9 @@ def main():
     application.add_handler(CallbackQueryHandler(fund,pattern="fund"))
     application.add_handler(CallbackQueryHandler(ss,pattern="ss"))
     application.add_handler(CallbackQueryHandler(account,pattern="account"))
+    application.add_handler(CommandHandler("addbalance", add_balance))
+    application.add_handler(CommandHandler("removebalance", remove_balance))
+
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,text_handler))
     application.add_handler(MessageHandler(filters.PHOTO,photo))
