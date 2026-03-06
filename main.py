@@ -3,9 +3,9 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKe
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # CONFIGURATION
-BOT_TOKEN = "8677165936:AAFxV_wPDgmBt6iyniA9qbmtA9cxnQzDgeE"
+BOT_TOKEN = os.getenv('BOT_TOKEN')
 API_URL = "https://electrosmm.com/api/v2"
-API_KEY = "49605c747dffe86921ebbddf14c54d16ea18fc48"
+API_KEY = os.getenv('API_KEY')
 ADMIN_ID = 7117775366
 CHANNEL = "@VERIFIEDPAISABOTS"
 
