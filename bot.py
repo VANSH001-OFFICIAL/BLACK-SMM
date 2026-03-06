@@ -1,401 +1,268 @@
-import json
-import os
-import threading
-from flask import Flask
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
+import logging
+from telegram import (
+    Update,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup
+)
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    CallbackQueryHandler,
+    ContextTypes
+)
 
-# ===== CONFIG =====
+TOKEN = "YOUR_BOT_TOKEN"
+ADMIN_ID = 123456789
 
-BOT_TOKEN = "8677165936:AAH0D0urU-FRv3L0eL4BhxoWV8dIg7OL8Yw"
+CHANNEL = "@verifiedpaisabots"
+ORDER_LOG_CHANNEL = "@blacksmm_payout"
 
-ADMIN_ID = 7117775366
+users = {}
+orders = []
+revenue = 0
 
-UPI_ID = "vansh59rt@fam"
+logging.basicConfig(level=logging.INFO)
 
-SUPPORT = "@black_seller16"
-
-ORDER_CHANNEL = "@blacksmm_payout"
-# ===== FLASK SERVER FOR RENDER =====
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Bot Running"
-
-def run():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
-
-def keep_alive():
-    t = threading.Thread(target=run)
-    t.start()
-
-# ===== LOAD SERVICES =====
-
-with open("services.json") as f:
-    services = json.load(f)
-
-try:
-    with open("database.json") as f:
-        db = json.load(f)
-except:
-    db = {"users": {}}
-
-def save():
-    with open("database.json", "w") as f:
-        json.dump(db, f, indent=4)
-
-def get_user(uid):
-    uid = str(uid)
-    if uid not in db["users"]:
-        db["users"][uid] = {"balance": 0, "orders": []}
-        save()
-    return db["users"][uid]
-
-def is_admin(uid):
-    return uid == ADMIN_ID
-
-# ===== MENU =====
-
-def main_menu():
-
-    keyboard = [
-        [InlineKeyboardButton("💰 Add Funds", callback_data="addfunds")],
-        [InlineKeyboardButton("📊 Services", callback_data="services")],
-        [InlineKeyboardButton("👤 My Account", callback_data="account")],
-        [InlineKeyboardButton("🛠 Support", callback_data="support")]
-    ]
-
-    return InlineKeyboardMarkup(keyboard)
-
-# ===== START =====
+# ---------------- START ----------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text(
-        "🚀 Welcome to SMM Bot",
-        reply_markup=main_menu()
+    user = update.effective_user
+    user_id = user.id
+
+    users[user_id] = users.get(user_id, {"balance": 0})
+
+    try:
+        member = await context.bot.get_chat_member(CHANNEL, user_id)
+
+        if member.status in ["member", "administrator", "creator"]:
+            await main_menu(update)
+
+        else:
+            raise Exception()
+
+    except:
+
+        keyboard = [
+            [InlineKeyboardButton("📢 JOIN CHANNEL", url="https://t.me/verifiedpaisabots")],
+            [InlineKeyboardButton("✅ VERIFY", callback_data="verify")]
+        ]
+
+        await update.message.reply_text(
+            "*🚫 Access Restricted*\n\n"
+            "First join our official channel to use this bot.",
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+# ---------------- VERIFY ----------------
+
+async def verify(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    try:
+        member = await context.bot.get_chat_member(CHANNEL, user_id)
+
+        if member.status in ["member", "administrator", "creator"]:
+            await query.message.delete()
+            await main_menu_query(query)
+
+        else:
+            await query.answer("Join the channel first!", show_alert=True)
+
+    except:
+        await query.answer("Join channel first!", show_alert=True)
+
+# ---------------- MAIN MENU ----------------
+
+async def main_menu(update: Update):
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🛒 SERVICES", callback_data="services"),
+            InlineKeyboardButton("💳 ADD FUND", callback_data="fund")
+        ],
+        [
+            InlineKeyboardButton("👤 MY ACCOUNT", callback_data="account"),
+            InlineKeyboardButton("🎧 SUPPORT", url="https://t.me/your_support")
+        ]
+    ]
+
+    text = (
+        "*🚀 ULTIMATE SMM PANEL BOT*\n\n"
+        "Fast Social Media Services\n"
+        "Instant Orders • Cheap Price\n\n"
+        "*Choose an option below:*"
     )
 
-# ===== BUTTONS =====
+    await update.message.reply_text(
+        text,
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def main_menu_query(query):
+
+    keyboard = [
+        [
+            InlineKeyboardButton("🛒 SERVICES", callback_data="services"),
+            InlineKeyboardButton("💳 ADD FUND", callback_data="fund")
+        ],
+        [
+            InlineKeyboardButton("👤 MY ACCOUNT", callback_data="account"),
+            InlineKeyboardButton("🎧 SUPPORT", url="https://t.me/your_support")
+        ]
+    ]
+
+    text = (
+        "*🚀 ULTIMATE SMM PANEL BOT*\n\n"
+        "Fast Social Media Services\n"
+        "Instant Orders • Cheap Price\n\n"
+        "*Choose an option below:*"
+    )
+
+    await query.message.reply_text(
+        text,
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+# ---------------- SERVICES ----------------
+
+async def services(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     query = update.callback_query
     await query.answer()
 
-    data = query.data
-    uid = query.from_user.id
+    text = (
+        "*📦 AVAILABLE SERVICES*\n\n"
+        "Instagram Followers\n"
+        "Instagram Likes\n"
+        "YouTube Views\n"
+        "Telegram Members\n\n"
+        "_Send link to place order_"
+    )
 
-    if data == "addfunds":
+    await query.message.reply_text(text, parse_mode="MarkdownV2")
 
-        keyboard = [
-            [InlineKeyboardButton("📤 Submit Screenshot", callback_data="submit")],
-            [InlineKeyboardButton("⬅ Back", callback_data="back")]
-        ]
+# ---------------- ACCOUNT ----------------
 
-        await query.message.edit_text(
-            f"Send payment to:\n\nUPI: {UPI_ID}",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+async def account(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    elif data == "submit":
+    query = update.callback_query
+    user_id = query.from_user.id
 
-        context.user_data["ss"] = True
-        await query.message.reply_text("Send Payment Screenshot")
+    balance = users[user_id]["balance"]
 
-    elif data == "services":
+    text = (
+        "*👤 YOUR ACCOUNT*\n\n"
+        f"*User ID:* `{user_id}`\n"
+        f"*Balance:* ₹{balance}\n\n"
+        "Use Add Fund to recharge"
+    )
 
-        keyboard = [
-            [InlineKeyboardButton("📸 Instagram", callback_data="cat_instagram")],
-            [InlineKeyboardButton("▶ YouTube", callback_data="cat_youtube")],
-            [InlineKeyboardButton("📢 Telegram", callback_data="cat_telegram")],
-            [InlineKeyboardButton("⬅ Back", callback_data="back")]
-        ]
+    await query.message.reply_text(text, parse_mode="MarkdownV2")
 
-        await query.message.edit_text(
-            "Select Platform",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+# ---------------- ADMIN COMMANDS ----------------
 
-    elif data.startswith("cat_"):
+async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-        cat = data.split("_")[1]
+    if update.effective_user.id != ADMIN_ID:
+        return
 
-        keyboard = []
+    user_id = int(context.args[0])
+    amount = int(context.args[1])
 
-        for i, s in enumerate(services[cat]):
+    users[user_id]["balance"] += amount
 
-            keyboard.append([
-                InlineKeyboardButton(
-                    f"{s['name']} ₹{s['price_per_1000']}/1k",
-                    callback_data=f"service_{cat}_{i}"
-                )
-            ])
+    await update.message.reply_text("Balance added successfully")
 
-        keyboard.append([InlineKeyboardButton("⬅ Back", callback_data="services")])
+async def remove_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-        await query.message.edit_text(
-            "Select Service",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+    if update.effective_user.id != ADMIN_ID:
+        return
 
-    elif data.startswith("service_"):
+    user_id = int(context.args[0])
+    amount = int(context.args[1])
 
-        _, cat, i = data.split("_")
+    users[user_id]["balance"] -= amount
 
-        s = services[cat][int(i)]
+    await update.message.reply_text("Balance removed")
 
-        context.user_data["service"] = s
+async def users_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-        await query.message.reply_text(
-            f"{s['name']}\n\nSend Link"
-        )
+    if update.effective_user.id != ADMIN_ID:
+        return
 
-    elif data == "account":
+    await update.message.reply_text(f"Total Users: {len(users)}")
 
-        user = get_user(uid)
+async def orders_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-        await query.message.edit_text(
-            f"👤 Account\n\nBalance: ₹{user['balance']}",
-            reply_markup=main_menu()
-        )
+    if update.effective_user.id != ADMIN_ID:
+        return
 
-    elif data == "support":
+    await update.message.reply_text(f"Total Orders: {len(orders)}")
 
-        await query.message.edit_text(
-            f"Contact Support: {SUPPORT}",
-            reply_markup=main_menu()
-        )
+async def revenue_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    elif data == "back":
+    if update.effective_user.id != ADMIN_ID:
+        return
 
-        await query.message.edit_text(
-            "🚀 Welcome to SMM Bot",
-            reply_markup=main_menu()
-        )
+    await update.message.reply_text(f"Revenue: ₹{revenue}")
 
-    # ===== ADMIN PAYMENT APPROVE =====
+# ---------------- BROADCAST ----------------
 
-    elif data.startswith("approve_"):
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-        if not is_admin(uid):
-            return
+    if update.effective_user.id != ADMIN_ID:
+        return
 
-        user_id = data.split("_")[1]
+    text = " ".join(context.args)
 
-        get_user(user_id)["balance"] += 100
+    sent = 0
 
-        save()
+    for user_id in users:
 
-        await query.message.reply_text("Payment Approved")
-
-    elif data.startswith("reject_"):
-
-        if not is_admin(uid):
-            return
-
-        await query.message.reply_text("Payment Rejected")
-
-# ===== MESSAGE HANDLER =====
-
-async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    uid = update.message.from_user.id
-    text = update.message.text
-
-    user = get_user(uid)
-
-    if context.user_data.get("service"):
-
-        if "link" not in context.user_data:
-
-            context.user_data["link"] = text
-            await update.message.reply_text("Send Quantity")
-            return
-
-        s = context.user_data["service"]
-
-        qty = int(text)
-
-        if qty < s["min_qty"]:
-
-            await update.message.reply_text(
-                f"Minimum order: {s['min_qty']}"
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                parse_mode="MarkdownV2"
             )
-            return
 
-        price = (qty / 1000) * s["price_per_1000"]
+            sent += 1
 
-        if user["balance"] < price:
+        except:
+            pass
 
-            await update.message.reply_text("❌ Insufficient Balance")
-            return
+    await update.message.reply_text(f"Broadcast sent to {sent} users")
 
-        user["balance"] -= price
-
-        order = f"""
-🚨 NEW ORDER
-
-User: {uid}
-
-Service: {s['name']}
-
-Link:
-{context.user_data['link']}
-
-Quantity: {qty}
-
-Price: ₹{price}
-"""
-
-        await context.bot.send_message(
-            ORDER_CHANNEL,
-            order
-        )
-
-        user["orders"].append(order)
-
-        save()
-
-        await update.message.reply_text(
-            f"✅ Order Placed\n\nCost: ₹{price}"
-        )
-
-        context.user_data.clear()
-
-# ===== SCREENSHOT HANDLER =====
-
-async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if context.user_data.get("ss"):
-
-        photo = update.message.photo[-1].file_id
-        uid = update.message.from_user.id
-
-        keyboard = [
-            [
-                InlineKeyboardButton("Approve", callback_data=f"approve_{uid}"),
-                InlineKeyboardButton("Reject", callback_data=f"reject_{uid}")
-            ]
-        ]
-
-        await context.bot.send_photo(
-            ADMIN_ID,
-            photo,
-            caption=f"Payment from {uid}",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
-        await update.message.reply_text("Payment sent for approval")
-
-# ===== ADMIN COMMANDS =====
-
-async def addbalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not is_admin(update.message.from_user.id):
-        return
-
-    try:
-        user_id = context.args[0]
-        amount = float(context.args[1])
-    except:
-        await update.message.reply_text("/addbalance user_id amount")
-        return
-
-    user = get_user(user_id)
-
-    user["balance"] += amount
-
-    save()
-
-    await update.message.reply_text("Balance Added")
-
-async def removebalance(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not is_admin(update.message.from_user.id):
-        return
-
-    try:
-        user_id = context.args[0]
-        amount = float(context.args[1])
-    except:
-        await update.message.reply_text("/removebalance user_id amount")
-        return
-
-    user = get_user(user_id)
-
-    user["balance"] -= amount
-
-    save()
-
-    await update.message.reply_text("Balance Removed")
-
-async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not is_admin(update.message.from_user.id):
-        return
-
-    await update.message.reply_text(
-        f"Total Users: {len(db['users'])}"
-    )
-
-async def orders(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not is_admin(update.message.from_user.id):
-        return
-
-    total = 0
-
-    for u in db["users"]:
-        total += len(db["users"][u]["orders"])
-
-    await update.message.reply_text(
-        f"Total Orders: {total}"
-    )
-
-async def revenue(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if not is_admin(update.message.from_user.id):
-        return
-
-    total = 0
-
-    for u in db["users"]:
-        for o in db["users"][u]["orders"]:
-            if "Price:" in o:
-                price = float(o.split("Price: ₹")[1])
-                total += price
-
-    await update.message.reply_text(
-        f"Total Revenue: ₹{total}"
-    )
-
-# ===== MAIN =====
+# ---------------- HANDLERS ----------------
 
 def main():
 
-    keep_alive()
+    app = ApplicationBuilder().token(TOKEN).build()
 
-    bot = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("broadcast", broadcast))
 
-    bot.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("addbalance", add_balance))
+    app.add_handler(CommandHandler("removebalance", remove_balance))
 
-    bot.add_handler(CommandHandler("addbalance", addbalance))
-    bot.add_handler(CommandHandler("removebalance", removebalance))
-    bot.add_handler(CommandHandler("users", users))
-    bot.add_handler(CommandHandler("orders", orders))
-    bot.add_handler(CommandHandler("revenue", revenue))
+    app.add_handler(CommandHandler("users", users_cmd))
+    app.add_handler(CommandHandler("orders", orders_cmd))
+    app.add_handler(CommandHandler("revenue", revenue_cmd))
 
-    bot.add_handler(CallbackQueryHandler(button))
+    app.add_handler(CallbackQueryHandler(verify, pattern="verify"))
+    app.add_handler(CallbackQueryHandler(services, pattern="services"))
+    app.add_handler(CallbackQueryHandler(account, pattern="account"))
 
-    bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
+    print("BOT RUNNING")
 
-    bot.add_handler(MessageHandler(filters.PHOTO, photo))
+    app.run_polling()
 
-    bot.run_polling()
-
-main()
+if __name__ == "__main__":
+    main()
 
