@@ -96,7 +96,6 @@ async def verify(update:Update,context:ContextTypes.DEFAULT_TYPE):
     uid = query.from_user.id
 
     if not await joined(context.bot,uid):
-
         await query.answer("Join first",show_alert=True)
         return
 
@@ -196,7 +195,6 @@ async def text_handler(update:Update,context:ContextTypes.DEFAULT_TYPE):
     if stage=="qty":
 
         qty=int(text)
-
         order_data[uid]["qty"]=qty
 
         with open("services.json") as f:
@@ -358,8 +356,10 @@ async def account(update:Update,context:ContextTypes.DEFAULT_TYPE):
     await query.message.reply_text(
         f"User: {uid}\nBalance: ₹{bal}"
     )
-    
-    async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# ---------------- ADMIN COMMANDS ---------------- #
+
+async def add_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if update.effective_user.id != ADMIN_ID:
         return
@@ -401,7 +401,6 @@ async def remove_balance(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"❌ Balance Removed\nUser: {uid}\nAmount: ₹{amount}"
     )
 
-
 # ---------------- MAIN ---------------- #
 
 def main():
@@ -419,9 +418,9 @@ def main():
     application.add_handler(CallbackQueryHandler(fund,pattern="fund"))
     application.add_handler(CallbackQueryHandler(ss,pattern="ss"))
     application.add_handler(CallbackQueryHandler(account,pattern="account"))
+
     application.add_handler(CommandHandler("addbalance", add_balance))
     application.add_handler(CommandHandler("removebalance", remove_balance))
-
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,text_handler))
     application.add_handler(MessageHandler(filters.PHOTO,photo))
@@ -433,3 +432,4 @@ def main():
 
 if __name__=="__main__":
     main()
+
