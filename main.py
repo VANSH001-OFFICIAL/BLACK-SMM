@@ -16,70 +16,64 @@ c = conn.cursor()
 c.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0)')
 conn.commit()
 
-# --- FLASK (Render Port Binding) ---
+# --- FLASK SERVER (Render Port Binding) ---
 app = Flask(__name__)
 @app.route('/')
-def home(): return "Bot is running!"
+def home(): return "Bot is live!"
 def run_flask(): app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
 
-# --- BOT LOGIC ---
+# --- BOT FUNCTIONS ---
 async def start(update, context):
     kb = [["SERVICES", "ADD FUND"], ["SUPPORT"]]
     await update.message.reply_text("Welcome to Panel!\nJoin @VERIFIEDPAISABOTS", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def handle_services(update, context):
-    text = "Select Category:\n1. Instagram\n2. YouTube\n3. Telegram\n\nCommand: /order [service_id] [link] [quantity]"
-    await update.message.reply_text(text)
+    kb = [
+        [InlineKeyboardButton("Instagram", callback_data="cat_instagram")],
+        [InlineKeyboardButton("YouTube", callback_data="cat_youtube")],
+        [InlineKeyboardButton("Telegram", callback_data="cat_telegram")]
+    ]
+    await update.message.reply_text("Select Category:", reply_markup=InlineKeyboardMarkup(kb))
+
+async def category_callback(update, context):
+    query = update.callback_query
+    cat = query.data.split("_")[1]
+    msg = f"Available {cat.upper()} Services:\n"
+    for s in services[cat]:
+        msg += f"ID: {s['id']} | {s['name']} | Rate: {s['price_per_1000']} RS/1k\n"
+    msg += "\nOrder format: /order [id] [link] [quantity]"
+    await query.message.reply_text(msg)
 
 async def order(update, context):
-    # args: [service_id, link, quantity]
     try:
         sid, link, qty = int(context.args[0]), context.args[1], int(context.args[2])
-        # Find service in JSON
-        found_service = None
+        found = None
         for cat in services.values():
             for s in cat:
-                if s['id'] == sid: found_service = s
+                if s['id'] == sid: found = s
         
-        if not found_service: return await update.message.reply_text("Invalid Service ID")
+        if not found: return await update.message.reply_text("Invalid ID!")
         
-        total = (found_service['price_per_1000'] / 1000) * qty
-        # Check Balance in DB
+        # Min Quantity Check
+        if qty < found.get('min_qty', 1000): return await update.message.reply_text(f"Min Qty: {found['min_qty']}")
+        
+        total = (found['price_per_1000'] / 1000) * qty
         c.execute("SELECT balance FROM users WHERE user_id=?", (update.effective_user.id,))
         bal = c.fetchone()
+        if not bal or bal[0] < total: return await update.message.reply_text("Low Balance!")
         
-        if not bal or bal[0] < total: return await update.message.reply_text("Insufficient Balance!")
-        
-        # API CALL
         resp = requests.post(API_URL, data={'key': API_KEY, 'action': 'add', 'service': sid, 'link': link, 'quantity': qty}).json()
         if 'order' in resp:
             c.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (total, update.effective_user.id))
             conn.commit()
-            await update.message.reply_text(f"Order Successful! ID: {resp['order']}")
-        else:
-            await update.message.reply_text(f"Error: {resp.get('error')}")
-    except Exception as e: await update.message.reply_text(f"Format: /order [id] [link] [qty]")
+            await update.message.reply_text(f"Order Success! ID: {resp['order']}")
+    except: await update.message.reply_text("Usage: /order [id] [link] [qty]")
 
-# --- ADMIN & PAYMENT ---
-async def add_fund(update, context):
-    await update.message.reply_text(f"Send Payment to: `vansh59rt@fam`\nSend screenshot here.")
-    context.user_data['pending'] = True
-
-async def screenshot_handler(update, context):
-    if context.user_data.get('pending'):
-        photo = update.message.photo[-1].file_id
-        btn = [[InlineKeyboardButton("Approve", callback_data=f"app_{update.effective_user.id}")]]
-        await context.bot.send_photo(ADMIN_ID, photo, caption=f"User: {update.effective_user.id}", reply_markup=InlineKeyboardMarkup(btn))
-        await update.message.reply_text("Request sent to Admin.")
-        context.user_data['pending'] = False
-
-async def approve(update, context):
-    query = update.callback_query
-    user_id = query.data.split("_")[1]
-    c.execute("INSERT OR IGNORE INTO users (user_id, balance) VALUES (?, 0)", (user_id,))
-    c.execute("UPDATE users SET balance = balance + 100 WHERE user_id = ?", (user_id,))
-    conn.commit()
-    await query.message.reply_text("Approved!")
+async def button_handler(update, context):
+    text = update.message.text
+    if text == "SERVICES": await handle_services(update, context)
+    elif text == "ADD FUND": await update.message.reply_text("Pay to `vansh59rt@fam` & send screenshot.")
+    elif text == "SUPPORT": await update.message.reply_text("Contact: @black_Seller16")
 
 # --- EXECUTION ---
 if __name__ == '__main__':
@@ -87,6 +81,6 @@ if __name__ == '__main__':
     bot = ApplicationBuilder().token(TOKEN).build()
     bot.add_handler(CommandHandler("start", start))
     bot.add_handler(CommandHandler("order", order))
-    bot.add_handler(MessageHandler(filters.PHOTO, screenshot_handler))
-    bot.add_handler(CallbackQueryHandler(approve))
+    bot.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, button_handler))
+    bot.add_handler(CallbackQueryHandler(category_callback, pattern="^cat_"))
     bot.run_polling()
