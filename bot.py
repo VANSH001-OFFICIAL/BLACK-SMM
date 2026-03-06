@@ -14,8 +14,8 @@ from telegram.ext import (
 
 # ---------------- CONFIG ---------------- #
 
-TOKEN = "YOUR_BOT_TOKEN"
-ADMIN_ID = 123456789
+TOKEN = "8677165936:AAH0D0urU-FRv3L0eL4BhxoWV8dIg7OL8Yw"
+ADMIN_ID = 7117775366
 FORCE_CHANNEL = "@verifiedpaisabots"
 UPI_ID = "vansh59rt@fam"
 ORDER_CHANNEL = "@blacksmm_payout"
