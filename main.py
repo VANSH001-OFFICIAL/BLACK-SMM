@@ -1,68 +1,121 @@
-import os, json, sqlite3
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
-from telegram.ext import (ApplicationBuilder, CommandHandler, CallbackQueryHandler, 
-                          MessageHandler, filters, ConversationHandler)
+import json
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# CONFIG
 TOKEN = os.getenv('BOT_TOKEN')
-ADMIN_ID = 7117775366
-CHANNEL = "@verifiedpaisabots"
 
-# DB
-conn = sqlite3.connect('bot.db', check_same_thread=False)
-c = conn.cursor()
-c.execute('CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, balance REAL DEFAULT 0)')
-conn.commit()
+UPI_ID = "vansh59rt@fam"
+SUPPORT = "@black_seller16"
 
-with open('services.json', 'r') as f: SERVICES = json.load(f)
+user_balance = {}
 
-# --- BOT LOGIC ---
-async def start(update, context):
-    try:
-        member = await context.bot.get_chat_member(CHANNEL, update.effective_user.id)
-        if member.status not in ['member', 'administrator', 'creator']:
-            await update.message.reply_text(f"❌ Join {CHANNEL} first!")
-            return
-    except: pass
-    
-    kb = [["SERVICES", "ADD FUND"], ["MY ACCOUNT", "SUPPORT"]]
-    await update.message.reply_text("🔥 **SMM Panel Active**", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+# load services
+with open("services.json") as f:
+    services = json.load(f)
 
-async def order(update, context):
-    if len(context.args) < 3: return await update.message.reply_text("❌ Format: `/order [id] [link] [qty]`")
-    sid, link, qty = int(context.args[0]), str(context.args[1]), int(context.args[2])
-    
-    # Auto Calc
-    s = next((item for cat in SERVICES.values() for item in cat if item['id'] == sid), None)
-    if not s: return await update.message.reply_text("❌ Invalid ID!")
-    
-    cost = (s['price_per_1000'] / 1000) * qty
-    c.execute("SELECT balance FROM users WHERE user_id=?", (update.effective_user.id,))
-    bal = c.fetchone()[0]
-    
-    if bal < cost: return await update.message.reply_text(f"❌ Low balance! Cost: {cost:.2f} RS")
-    
-    c.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (cost, update.effective_user.id))
-    conn.commit()
-    await update.message.reply_text(f"✅ Order Placed! {cost:.2f} RS deducted.")
 
-async def admin_cmd(update, context):
-    if update.effective_user.id != ADMIN_ID: return
-    action, uid, amt = context.args[0], int(context.args[1]), float(context.args[2])
-    c.execute("INSERT OR IGNORE INTO users (user_id, balance) VALUES (?, 0)", (uid,))
-    c.execute(f"UPDATE users SET balance = balance {'+' if action == 'add' else '-'} ? WHERE user_id = ?", (amt, uid))
-    conn.commit()
-    await update.message.reply_text(f"✅ {action.upper()} {amt} to {uid}")
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-# --- HANDLER SETUP ---
-if __name__ == '__main__':
-    bot = ApplicationBuilder().token(TOKEN).build()
-    
-    # Add handlers
-    bot.add_handler(CommandHandler("start", start))
-    bot.add_handler(CommandHandler("order", order))
-    bot.add_handler(CommandHandler("admin", admin_cmd))
-    bot.add_handler(MessageHandler(filters.Regex("^SERVICES$"), lambda u,c: u.message.reply_text("Choose Category", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Insta", callback_data="show_instagram")]]))))
-    bot.add_handler(MessageHandler(filters.Regex("^MY ACCOUNT$"), lambda u,c: c.bot.send_message(u.effective_chat.id, f"Balance: {c.bot.get_chat_member(u.effective_chat.id, u.effective_user.id)}"))) # Placeholder
-    # (Add remaining standard handlers here)
-    bot.run_polling()
+    keyboard = [
+        [InlineKeyboardButton("💰 Add Funds", callback_data="addfunds")],
+        [InlineKeyboardButton("📊 Services", callback_data="services")],
+        [InlineKeyboardButton("👤 My Account", callback_data="account")],
+        [InlineKeyboardButton("🛠 Support", callback_data="support")]
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text("Welcome to SMM Bot", reply_markup=reply_markup)
+
+
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+
+    if data == "addfunds":
+
+        keyboard = [
+            [InlineKeyboardButton("📤 Submit SS", callback_data="submit_ss")],
+            [InlineKeyboardButton("❌ Cancel", callback_data="cancel")]
+        ]
+
+        await query.message.reply_text(
+            f"Send payment to UPI:\n\n{UPI_ID}\n\nAfter payment click Submit SS",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    elif data == "submit_ss":
+        await query.message.reply_text("Please send your payment screenshot.")
+        context.user_data["awaiting_ss"] = True
+
+    elif data == "services":
+
+        keyboard = [
+            [InlineKeyboardButton("📸 Instagram", callback_data="instagram")],
+            [InlineKeyboardButton("▶ YouTube", callback_data="youtube")],
+            [InlineKeyboardButton("📢 Telegram", callback_data="telegram")]
+        ]
+
+        await query.message.reply_text("Select Service", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif data in ["instagram", "youtube", "telegram"]:
+
+        text = f"Available {data.upper()} Services:\n\n"
+
+        for s in services[data]:
+            text += f"{s['name']}\nPrice per 1000: ₹{s['price_per_1000']}\nMin: {s['min_qty']}\n\n"
+
+        await query.message.reply_text(text)
+
+    elif data == "account":
+
+        user_id = query.from_user.id
+        balance = user_balance.get(user_id, 0)
+
+        await query.message.reply_text(f"Your Balance: ₹{balance}")
+
+    elif data == "support":
+
+        await query.message.reply_text(f"Support: {SUPPORT}")
+
+    elif data == "cancel":
+
+        context.user_data["awaiting_ss"] = False
+        await query.message.reply_text("Cancelled.")
+
+
+async def screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    if context.user_data.get("awaiting_ss"):
+
+        photo = update.message.photo[-1].file_id
+
+        ADMIN_ID = 123456789  # change to your telegram id
+
+        await context.bot.send_photo(
+            chat_id=ADMIN_ID,
+            photo=photo,
+            caption=f"New Payment Screenshot\nUser: {update.message.from_user.id}"
+        )
+
+        await update.message.reply_text("Screenshot submitted. Wait for approval.")
+
+        context.user_data["awaiting_ss"] = False
+
+
+def main():
+
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button))
+    app.add_handler(MessageHandler(filters.PHOTO, screenshot))
+
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
