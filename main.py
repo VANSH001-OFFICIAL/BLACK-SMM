@@ -11,7 +11,7 @@ CHANNEL = "@VERIFIEDPAISABOTS"
 PAYOUT_CHANNEL = "@BLACKSMM_PAYOUT"
 ASK_AMT = 2 
 
-# --- FLASK (Render Port Binding) ---
+# --- FLASK (Render Port Binding Fix) ---
 app = Flask(__name__)
 @app.route('/')
 def home(): return "Bot is Online!"
@@ -29,7 +29,7 @@ async def start(update, context):
         member = await context.bot.get_chat_member(CHANNEL, update.effective_user.id)
         if member.status not in ['member', 'administrator', 'creator']:
             kb = [[InlineKeyboardButton("Join Channel 📢", url=f"https://t.me/{CHANNEL.strip('@')}")]];
-            return await update.message.reply_text("❌ Join channel first!", reply_markup=InlineKeyboardMarkup(kb))
+            return await update.message.reply_text("❌ Pehle channel join karein!", reply_markup=InlineKeyboardMarkup(kb))
     except: return await update.message.reply_text(f"❌ Join {CHANNEL} first!")
     
     kb = [["SERVICES", "ADD FUND"], ["MY ACCOUNT", "SUPPORT"]]
@@ -45,7 +45,7 @@ async def order(update, context):
     if len(context.args) < 3: return await update.message.reply_text("❌ Format: `/order [id] [link] [qty]`")
     c.execute("SELECT balance FROM users WHERE user_id=?", (update.effective_user.id,))
     bal = (c.fetchone() or (0,))[0]
-    msg = f"📩 **New Request**\n\n🆔 User: `{update.effective_user.id}`\n📦 Service: `{context.args[0]}`\n🔗 Link: `{context.args[1]}`\n🔢 Qty: `{context.args[2]}`\n💰 Bal: {bal} RS"
+    msg = f"📩 **New Order Request**\n\n🆔 User: `{update.effective_user.id}`\n📦 Service: `{context.args[0]}`\n🔗 Link: `{context.args[1]}`\n🔢 Qty: `{context.args[2]}`\n💰 Bal: {bal} RS"
     await context.bot.send_message(PAYOUT_CHANNEL, msg, parse_mode='Markdown')
     await update.message.reply_text("✅ Order request admin ko bhej di gayi hai!")
 
