@@ -11,8 +11,8 @@ from telegram.ext import (
     ContextTypes
 )
 
-TOKEN = "YOUR_BOT_TOKEN"
-ADMIN_ID = 123456789
+TOKEN = "8677165936:AAH0D0urU-FRv3L0eL4BhxoWV8dIg7OL8Yw"
+ADMIN_ID = 7117775366
 
 CHANNEL = "@verifiedpaisabots"
 ORDER_LOG_CHANNEL = "@blacksmm_payout"
