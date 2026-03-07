@@ -1,19 +1,19 @@
 {
   "instagram": [
-    {"name": "INSTAGRAM REEL VIEWS", "id": 3487, "price_per_1000": 0.2, "min_qty": 1000},
-    {"name": "INSTA REEL VIEWS + REACH + IMPRESSION", "id": 2456, "price_per_1000": 5, "min_qty": 1000},
-    {"name": "INSTA LIKES", "id": 3344, "price_per_1000": 10, "min_qty": 1000},
-    {"name": "INSTA FOLLOWERS [HIGH QUALITY]", "id": 3428, "price_per_1000": 35, "min_qty": 1000}
+    {"name": "INSTAGRAM REEL VIEWS", "id": 3487, "price_per_1000": 0.418, "min_qty": 1000},
+    {"name": "INSTA REEL VIEWS + REACH + IMPRESSION", "id": 2456, "price_per_1000": 10.45, "min_qty": 1000},
+    {"name": "INSTA LIKES", "id": 3344, "price_per_1000": 20.9, "min_qty": 1000},
+    {"name": "INSTA FOLLOWERS [HIGH QUALITY]", "id": 3428, "price_per_1000": 73.15, "min_qty": 1000}
   ],
   "youtube": [
-    {"name": "YOUTUBE LIKES", "id": 2015, "price_per_1000": 8, "min_qty": 1000},
-    {"name": "YOUTUBE VIEWS [0 DROP]", "id": 3371, "price_per_1000": 51, "min_qty": 1000}
+    {"name": "YOUTUBE LIKES", "id": 2015, "price_per_1000": 16.72, "min_qty": 1000},
+    {"name": "YOUTUBE VIEWS [0 DROP]", "id": 3371, "price_per_1000": 106.59, "min_qty": 1000}
   ],
   "telegram": [
-    {"name": "TELEGRAM MEMBERS [NON-DROPS]", "id": 2737, "price_per_1000": 20, "min_qty": 1000},
-    {"name": "TELEGRAM VIEWS [SINGLE POST]", "id": 2779, "price_per_1000": 1, "min_qty": 1000},
-    {"name": "TELEGRAM VIEWS MULTIPLE POST [LAST 5]", "id": 3161, "price_per_1000": 1.5, "min_qty": 1000},
-    {"name": "TELEGRAM REACTS [POSITIVE]", "id": 369, "price_per_1000": 7, "min_qty": 10},
-    {"name": "TELEGRAM REACTS [NEGATIVE]", "id": 397, "price_per_1000": 7, "min_qty": 10}
+    {"name": "TELEGRAM MEMBERS [NON-DROPS]", "id": 2737, "price_per_1000": 41.8, "min_qty": 1000},
+    {"name": "TELEGRAM VIEWS [SINGLE POST]", "id": 2779, "price_per_1000": 2.09, "min_qty": 1000},
+    {"name": "TELEGRAM VIEWS MULTIPLE POST [LAST 5]", "id": 3161, "price_per_1000": 3.135, "min_qty": 1000},
+    {"name": "TELEGRAM REACTS [POSITIVE]", "id": 369, "price_per_1000": 14.63, "min_qty": 10},
+    {"name": "TELEGRAM REACTS [NEGATIVE]", "id": 397, "price_per_1000": 14.63, "min_qty": 10}
   ]
 }
