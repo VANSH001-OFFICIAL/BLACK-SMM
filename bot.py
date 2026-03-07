@@ -2,6 +2,7 @@ import sqlite3
 import logging
 import os
 import threading
+import json
 from flask import Flask
 from telegram import *
 from telegram.ext import *
@@ -23,7 +24,7 @@ cur.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,balance REA
 cur.execute("CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY AUTOINCREMENT,user INT,service TEXT,link TEXT,qty INT,price REAL)")
 conn.commit()
 
-# ---------------- FLASK SERVER (RENDER FIX) ---------------- #
+# ---------------- FLASK SERVER ---------------- #
 
 app = Flask(__name__)
 
@@ -35,13 +36,10 @@ def run():
     port = int(os.environ.get("PORT",10000))
     app.run(host="0.0.0.0",port=port)
 
-# ---------------- SERVICES ---------------- #
+# ---------------- LOAD SERVICES ---------------- #
 
-SERVICES={
-"Instagram Followers":{"price":0.25,"min":100},
-"Instagram Likes":{"price":0.20,"min":50},
-"Youtube Views":{"price":0.15,"min":100}
-}
+with open("services.json","r") as f:
+    SERVICES=json.load(f)
 
 # ---------------- MEMORY ---------------- #
 
@@ -107,7 +105,7 @@ async def start(update,context):
     ]
 
     await update.message.reply_text(
-        "🚀 Welcome to *Black SMM Panel*\n\nSelect option below.",
+        "🚀 Welcome to *Black SMM Panel*",
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardMarkup(kb,resize_keyboard=True)
     )
@@ -127,21 +125,40 @@ async def account(update,context):
 
 async def services(update,context):
 
-    kb=[]
+    kb=[
+        [InlineKeyboardButton("📸 Instagram",callback_data="cat_instagram")],
+        [InlineKeyboardButton("▶️ Youtube",callback_data="cat_youtube")],
+        [InlineKeyboardButton("✈️ Telegram",callback_data="cat_telegram")]
+    ]
 
-    for s in SERVICES:
+    await update.message.reply_text(
+        "📦 Select Category",
+        reply_markup=InlineKeyboardMarkup(kb)
+    )
 
-        kb.append([
+# ---------------- CATEGORY ---------------- #
+
+async def category(update,context):
+
+    q=update.callback_query
+    await q.answer()
+
+    cat=q.data.split("_")[1]
+
+    buttons=[]
+
+    for i,s in enumerate(SERVICES[cat]):
+
+        buttons.append([
             InlineKeyboardButton(
-                f"{s}",
-                callback_data=f"srv_{s}"
+                s["name"],
+                callback_data=f"srv_{cat}_{i}"
             )
         ])
 
-    await update.message.reply_text(
-        "📦 *Select Service*",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(kb)
+    await q.edit_message_text(
+        f"📦 {cat.upper()} Services",
+        reply_markup=InlineKeyboardMarkup(buttons)
     )
 
 # ---------------- SERVICE SELECT ---------------- #
@@ -152,12 +169,27 @@ async def select_service(update,context):
     await q.answer()
 
     uid=q.from_user.id
-    service=q.data.split("_",1)[1]
+
+    data=q.data.split("_")
+
+    cat=data[1]
+    index=int(data[2])
+
+    service=SERVICES[cat][index]
 
     order_stage[uid]="link"
     order_data[uid]={"service":service}
 
-    await q.message.reply_text("🔗 Send service link")
+    await q.message.reply_text(
+        f"""
+📦 {service['name']}
+
+💰 Price /1000 : ₹{service['price_per_1000']}
+📉 Min Order : {service['min_qty']}
+
+🔗 Send link
+"""
+    )
 
 # ---------------- TEXT HANDLER ---------------- #
 
@@ -181,12 +213,10 @@ async def text_handler(update,context):
             fund_data[uid]={"amount":amount}
             fund_stage[uid]="screenshot"
 
-            await update.message.reply_text(
-                "📸 Send payment screenshot"
-            )
+            await update.message.reply_text("📸 Send payment screenshot")
             return
 
-# ---------- ORDER FLOW ---------- #
+# ---------- MENU ---------- #
 
     if uid not in order_stage:
 
@@ -197,9 +227,7 @@ async def text_handler(update,context):
 
             fund_stage[uid]="amount"
 
-            await update.message.reply_text(
-                "💳 Send payment amount"
-            )
+            await update.message.reply_text("💳 Send payment amount")
 
         elif text=="👤 My Account":
             await account(update,context)
@@ -221,7 +249,7 @@ async def text_handler(update,context):
         await update.message.reply_text("🔢 Send quantity")
         return
 
-# ---------- QUANTITY ---------- #
+# ---------- QTY ---------- #
 
     if stage=="qty":
 
@@ -233,17 +261,17 @@ async def text_handler(update,context):
 
         service=order_data[uid]["service"]
 
-        if qty < SERVICES[service]["min"]:
+        if qty < service["min_qty"]:
 
             await update.message.reply_text(
-                f"⚠️ Minimum quantity : {SERVICES[service]['min']}"
+                f"⚠️ Minimum quantity {service['min_qty']}"
             )
             return
 
-        price=SERVICES[service]["price"]*qty
+        price=(qty/1000)*service["price_per_1000"]
 
         order_data[uid]["qty"]=qty
-        order_data[uid]["price"]=price
+        order_data[uid]["price"]=round(price,2)
 
         kb=[[InlineKeyboardButton("✅ Confirm",callback_data="confirm"),
              InlineKeyboardButton("❌ Cancel",callback_data="cancel")]]
@@ -251,11 +279,11 @@ async def text_handler(update,context):
         txt=f"""
 🧾 *ORDER PREVIEW*
 
-Service : {service}
+Service : {service['name']}
 Link : {order_data[uid]['link']}
 Quantity : {qty}
 
-💰 Price : ₹{price}
+💰 Price : ₹{round(price,2)}
 """
 
         await update.message.reply_text(
@@ -266,7 +294,7 @@ Quantity : {qty}
 
         order_stage[uid]="confirm"
 
-# ---------------- CONFIRM ORDER ---------------- #
+# ---------------- CONFIRM ---------------- #
 
 async def confirm(update,context):
 
@@ -276,10 +304,6 @@ async def confirm(update,context):
     uid=q.from_user.id
 
     if uid not in order_data:
-
-        await q.message.reply_text(
-            "⚠️ Session expired\nStart again"
-        )
         return
 
     order=order_data[uid]
@@ -295,7 +319,7 @@ async def confirm(update,context):
 
     cur.execute(
     "INSERT INTO orders(user,service,link,qty,price) VALUES(?,?,?,?,?)",
-    (uid,order["service"],order["link"],order["qty"],order["price"])
+    (uid,order["service"]["name"],order["link"],order["qty"],order["price"])
     )
 
     conn.commit()
@@ -305,7 +329,7 @@ async def confirm(update,context):
 
 User : {uid}
 
-Service : {order['service']}
+Service : {order['service']['name']}
 Link : {order['link']}
 Qty : {order['qty']}
 Price : ₹{order['price']}
@@ -317,7 +341,7 @@ Price : ₹{order['price']}
         parse_mode="Markdown"
     )
 
-    await q.message.reply_text("✅ Order placed successfully")
+    await q.message.reply_text("✅ Order placed")
 
     del order_stage[uid]
     del order_data[uid]
@@ -348,7 +372,7 @@ async def photo(update,context):
     if uid not in fund_stage:
         return
 
-    if fund_stage.get(uid)!="screenshot":
+    if fund_stage[uid]!="screenshot":
         return
 
     amount=fund_data[uid]["amount"]
@@ -363,11 +387,11 @@ async def photo(update,context):
     await context.bot.send_photo(
         ADMIN_ID,
         update.message.photo[-1].file_id,
-        caption=f"💳 Payment Request\n\nUser : {uid}\nAmount : ₹{amount}",
+        caption=f"💳 Payment\nUser:{uid}\nAmount:₹{amount}",
         reply_markup=InlineKeyboardMarkup(kb)
     )
 
-    await update.message.reply_text("✅ Sent to admin for approval")
+    await update.message.reply_text("✅ Sent to admin")
 
     del fund_stage[uid]
     del fund_data[uid]
@@ -429,12 +453,6 @@ async def orders(update,context):
         parse_mode="Markdown"
     )
 
-# ---------------- ERROR HANDLER ---------------- #
-
-async def error_handler(update,context):
-
-    print(context.error)
-
 # ---------------- MAIN ---------------- #
 
 def main():
@@ -443,6 +461,7 @@ def main():
 
     application.add_handler(CommandHandler("start",start))
 
+    application.add_handler(CallbackQueryHandler(category,pattern="cat_"))
     application.add_handler(CallbackQueryHandler(select_service,pattern="srv_"))
     application.add_handler(CallbackQueryHandler(confirm,pattern="confirm"))
     application.add_handler(CallbackQueryHandler(cancel,pattern="cancel"))
@@ -451,8 +470,6 @@ def main():
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,text_handler))
     application.add_handler(MessageHandler(filters.PHOTO,photo))
-
-    application.add_error_handler(error_handler)
 
     threading.Thread(target=run).start()
 
