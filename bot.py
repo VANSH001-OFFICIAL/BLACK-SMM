@@ -109,15 +109,27 @@ async def start(update,context):
     ]
 
     msg="""
-🔥 *WELCOME TO BLACK SMM PANEL*
+🔥 *WELCOME TO BLACK SMM PANEL* 🔥
+
+🚀 Fastest Social Media Growth Services
 
 📸 Instagram
 ▶️ YouTube
 ✈️ Telegram
 
-⚡ Instant Delivery
-💰 Cheapest Prices
-🔒 Secure Payments
+━━━━━━━━━━━━━━━
+
+⚡ Instant Delivery  
+💰 Cheapest Prices  
+🔒 Secure Payments  
+📊 Real Growth Services  
+
+━━━━━━━━━━━━━━━
+
+💳 Add balance using UPI  
+📦 Place order instantly  
+
+👇 Select an option below to begin
 """
 
     await update.message.reply_text(
