@@ -35,7 +35,7 @@ def home():
     return "SMM BOT RUNNING"
 
 def run():
-    port = int(os.environ.get("PORT",10000))
+    port=int(os.environ.get("PORT",10000))
     app.run(host="0.0.0.0",port=port)
 
 # ---------------- LOAD SERVICES ---------------- #
@@ -65,6 +65,7 @@ def get_balance(uid):
 
     return 0
 
+
 def set_balance(uid,b):
 
     cur.execute("UPDATE users SET balance=? WHERE id=?",(b,uid))
@@ -79,6 +80,7 @@ async def joined(bot,uid):
         return m.status in ["member","administrator","creator"]
     except:
         return False
+
 
 def join_buttons():
 
@@ -106,28 +108,16 @@ async def start(update,context):
         ["👤 My Account","📦 Orders"]
     ]
 
-    msg=f"""
-🔥 *WELCOME TO BLACK SMM PANEL* 🔥
-
-🚀 *Fastest Social Media Growth Services*
+    msg="""
+🔥 *WELCOME TO BLACK SMM PANEL*
 
 📸 Instagram
 ▶️ YouTube
 ✈️ Telegram
 
-━━━━━━━━━━━━━━━
-
-⚡ Instant Delivery  
-💰 Cheapest Prices  
-🔒 Secure Payments  
-📊 Real Growth Services  
-
-━━━━━━━━━━━━━━━
-
-💳 Add balance using UPI  
-📦 Place order instantly  
-
-👇 *Select an option below to begin*
+⚡ Instant Delivery
+💰 Cheapest Prices
+🔒 Secure Payments
 """
 
     await update.message.reply_text(
@@ -241,9 +231,7 @@ async def text_handler(update,context):
             fund_data[uid]={"amount":amount}
             fund_stage[uid]="screenshot"
 
-            await update.message.reply_text(
-                "📸 Send payment screenshot"
-            )
+            await update.message.reply_text("📸 Send payment screenshot")
             return
 
 # ---------- MENU ---------- #
@@ -526,4 +514,3 @@ def main():
 
 if __name__=="__main__":
     main()
-
