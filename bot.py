@@ -13,6 +13,8 @@ ADMIN_ID = 7117775366
 FORCE_CHANNEL = "@verifiedpaisabots"
 PAYOUT_CHANNEL = "@blacksmm_payout"
 
+UPI_ID = "vansh59rt@fam"
+
 logging.basicConfig(level=logging.INFO)
 
 # ---------------- DATABASE ---------------- #
@@ -104,8 +106,32 @@ async def start(update,context):
         ["👤 My Account","📦 Orders"]
     ]
 
+    msg=f"""
+🔥 *WELCOME TO BLACK SMM PANEL* 🔥
+
+🚀 *Fastest Social Media Growth Services*
+
+📸 Instagram
+▶️ YouTube
+✈️ Telegram
+
+━━━━━━━━━━━━━━━
+
+⚡ Instant Delivery  
+💰 Cheapest Prices  
+🔒 Secure Payments  
+📊 Real Growth Services  
+
+━━━━━━━━━━━━━━━
+
+💳 Add balance using UPI  
+📦 Place order instantly  
+
+👇 *Select an option below to begin*
+"""
+
     await update.message.reply_text(
-        "🚀 Welcome to *Black SMM Panel*",
+        msg,
         parse_mode="Markdown",
         reply_markup=ReplyKeyboardMarkup(kb,resize_keyboard=True)
     )
@@ -132,7 +158,8 @@ async def services(update,context):
     ]
 
     await update.message.reply_text(
-        "📦 Select Category",
+        "📦 *Select Category*",
+        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(kb)
     )
 
@@ -181,14 +208,15 @@ async def select_service(update,context):
     order_data[uid]={"service":service}
 
     await q.message.reply_text(
-        f"""
-📦 {service['name']}
+f"""
+📦 *{service['name']}*
 
 💰 Price /1000 : ₹{service['price_per_1000']}
-📉 Min Order : {service['min_qty']}
+📉 Minimum Order : {service['min_qty']}
 
-🔗 Send link
-"""
+🔗 Send your link
+""",
+parse_mode="Markdown"
     )
 
 # ---------------- TEXT HANDLER ---------------- #
@@ -213,7 +241,9 @@ async def text_handler(update,context):
             fund_data[uid]={"amount":amount}
             fund_stage[uid]="screenshot"
 
-            await update.message.reply_text("📸 Send payment screenshot")
+            await update.message.reply_text(
+                "📸 Send payment screenshot"
+            )
             return
 
 # ---------- MENU ---------- #
@@ -227,7 +257,18 @@ async def text_handler(update,context):
 
             fund_stage[uid]="amount"
 
-            await update.message.reply_text("💳 Send payment amount")
+            await update.message.reply_text(
+f"""
+💳 *Add Balance*
+
+Send payment to this UPI 👇
+
+`{UPI_ID}`
+
+After payment send the amount you paid.
+""",
+parse_mode="Markdown"
+            )
 
         elif text=="👤 My Account":
             await account(update,context)
@@ -387,7 +428,15 @@ async def photo(update,context):
     await context.bot.send_photo(
         ADMIN_ID,
         update.message.photo[-1].file_id,
-        caption=f"💳 Payment\nUser:{uid}\nAmount:₹{amount}",
+        caption=f"""
+💳 *Payment Request*
+
+User : {uid}
+Amount : ₹{amount}
+
+UPI : {UPI_ID}
+""",
+        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(kb)
     )
 
