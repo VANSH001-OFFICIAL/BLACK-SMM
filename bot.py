@@ -7,9 +7,9 @@ from threading import Thread
 from telegram import *
 from telegram.ext import *
 
-TOKEN = "YOUR_BOT_TOKEN"
-ADMIN_ID = 123456789
-CHANNEL = "@yourchannel"
+TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID = 7117775366
+CHANNEL = "@verifiedpaisabots"
 UPI_ID = "vansh59rt@fam"
 
 # ---------------- FLASK SERVER ---------------- #
