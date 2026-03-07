@@ -7,6 +7,7 @@ from telegram import *
 from telegram.ext import *
 
 TOKEN = os.getenv("BOT_TOKEN")
+
 ADMIN_ID = 7117775366
 FORCE_CHANNEL = "@verifiedpaisabots"
 PAYOUT_CHANNEL = "@blacksmm_payout"
@@ -22,13 +23,13 @@ cur.execute("CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,balance REA
 cur.execute("CREATE TABLE IF NOT EXISTS orders(id INTEGER PRIMARY KEY AUTOINCREMENT,user INT,service TEXT,link TEXT,qty INT,price REAL)")
 conn.commit()
 
-# ---------------- FLASK SERVER ---------------- #
+# ---------------- FLASK SERVER (RENDER FIX) ---------------- #
 
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "Bot Running"
+    return "SMM BOT RUNNING"
 
 def run():
     port = int(os.environ.get("PORT",10000))
@@ -82,8 +83,8 @@ async def joined(bot,uid):
 def join_buttons():
 
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("JOIN CHANNEL",url="https://t.me/verifiedpaisabots")],
-        [InlineKeyboardButton("VERIFY",callback_data="verify")]
+        [InlineKeyboardButton("📢 Join Channel",url="https://t.me/verifiedpaisabots")],
+        [InlineKeyboardButton("✅ Verify",callback_data="verify")]
     ])
 
 # ---------------- START ---------------- #
@@ -95,15 +96,19 @@ async def start(update,context):
     if not await joined(context.bot,uid):
 
         await update.message.reply_text(
-            "Join channel first",
+            "⚠️ Please join the channel first",
             reply_markup=join_buttons()
         )
         return
 
-    kb=[["Services","Add Fund"],["My Account","Orders"]]
+    kb=[
+        ["🛒 Services","💳 Add Fund"],
+        ["👤 My Account","📦 Orders"]
+    ]
 
     await update.message.reply_text(
-        "Welcome to SMM Panel Bot",
+        "🚀 Welcome to *Black SMM Panel*\n\nSelect option below.",
+        parse_mode="Markdown",
         reply_markup=ReplyKeyboardMarkup(kb,resize_keyboard=True)
     )
 
@@ -113,7 +118,10 @@ async def account(update,context):
 
     bal=get_balance(update.effective_user.id)
 
-    await update.message.reply_text(f"Balance : ₹{bal}")
+    await update.message.reply_text(
+        f"👤 *Your Account*\n\n💰 Balance : ₹{bal}",
+        parse_mode="Markdown"
+    )
 
 # ---------------- SERVICES ---------------- #
 
@@ -122,10 +130,17 @@ async def services(update,context):
     kb=[]
 
     for s in SERVICES:
-        kb.append([InlineKeyboardButton(s,callback_data=f"srv_{s}")])
+
+        kb.append([
+            InlineKeyboardButton(
+                f"{s}",
+                callback_data=f"srv_{s}"
+            )
+        ])
 
     await update.message.reply_text(
-        "Select Service",
+        "📦 *Select Service*",
+        parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(kb)
     )
 
@@ -142,7 +157,7 @@ async def select_service(update,context):
     order_stage[uid]="link"
     order_data[uid]={"service":service}
 
-    await q.message.reply_text("Send link")
+    await q.message.reply_text("🔗 Send service link")
 
 # ---------------- TEXT HANDLER ---------------- #
 
@@ -157,67 +172,95 @@ async def text_handler(update,context):
 
         if fund_stage[uid]=="amount":
 
-            fund_data[uid]={"amount":text}
+            try:
+                amount=float(text)
+            except:
+                await update.message.reply_text("❌ Send valid amount")
+                return
+
+            fund_data[uid]={"amount":amount}
             fund_stage[uid]="screenshot"
 
-            await update.message.reply_text("Send payment screenshot")
+            await update.message.reply_text(
+                "📸 Send payment screenshot"
+            )
             return
 
 # ---------- ORDER FLOW ---------- #
 
     if uid not in order_stage:
 
-        if text=="Services":
+        if text=="🛒 Services":
             await services(update,context)
 
-        elif text=="Add Fund":
+        elif text=="💳 Add Fund":
 
             fund_stage[uid]="amount"
-            await update.message.reply_text("Send amount")
 
-        elif text=="My Account":
+            await update.message.reply_text(
+                "💳 Send payment amount"
+            )
+
+        elif text=="👤 My Account":
             await account(update,context)
 
-        elif text=="Orders":
+        elif text=="📦 Orders":
             await orders(update,context)
 
         return
 
     stage=order_stage[uid]
 
+# ---------- LINK ---------- #
+
     if stage=="link":
 
         order_data[uid]["link"]=text
         order_stage[uid]="qty"
 
-        await update.message.reply_text("Send quantity")
+        await update.message.reply_text("🔢 Send quantity")
         return
+
+# ---------- QUANTITY ---------- #
 
     if stage=="qty":
 
-        qty=int(text)
+        try:
+            qty=int(text)
+        except:
+            await update.message.reply_text("❌ Send valid quantity")
+            return
 
         service=order_data[uid]["service"]
+
+        if qty < SERVICES[service]["min"]:
+
+            await update.message.reply_text(
+                f"⚠️ Minimum quantity : {SERVICES[service]['min']}"
+            )
+            return
+
         price=SERVICES[service]["price"]*qty
 
         order_data[uid]["qty"]=qty
         order_data[uid]["price"]=price
 
-        kb=[[InlineKeyboardButton("Confirm",callback_data="confirm"),
-             InlineKeyboardButton("Cancel",callback_data="cancel")]]
+        kb=[[InlineKeyboardButton("✅ Confirm",callback_data="confirm"),
+             InlineKeyboardButton("❌ Cancel",callback_data="cancel")]]
 
         txt=f"""
-ORDER PREVIEW
+🧾 *ORDER PREVIEW*
 
 Service : {service}
 Link : {order_data[uid]['link']}
-Qty : {qty}
+Quantity : {qty}
 
-Price : ₹{price}
+💰 Price : ₹{price}
 """
 
         await update.message.reply_text(
             txt,
+            parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup(kb)
         )
 
@@ -231,13 +274,21 @@ async def confirm(update,context):
     await q.answer()
 
     uid=q.from_user.id
+
+    if uid not in order_data:
+
+        await q.message.reply_text(
+            "⚠️ Session expired\nStart again"
+        )
+        return
+
     order=order_data[uid]
 
     bal=get_balance(uid)
 
     if bal<order["price"]:
 
-        await q.message.reply_text("Insufficient balance")
+        await q.message.reply_text("❌ Insufficient balance")
         return
 
     set_balance(uid,bal-order["price"])
@@ -250,19 +301,23 @@ async def confirm(update,context):
     conn.commit()
 
     txt=f"""
-NEW ORDER
+🚀 *NEW ORDER*
 
 User : {uid}
 
 Service : {order['service']}
 Link : {order['link']}
 Qty : {order['qty']}
-Price : {order['price']}
+Price : ₹{order['price']}
 """
 
-    await context.bot.send_message(PAYOUT_CHANNEL,txt)
+    await context.bot.send_message(
+        PAYOUT_CHANNEL,
+        txt,
+        parse_mode="Markdown"
+    )
 
-    await q.message.reply_text("Order placed successfully")
+    await q.message.reply_text("✅ Order placed successfully")
 
     del order_stage[uid]
     del order_data[uid]
@@ -282,7 +337,7 @@ async def cancel(update,context):
     if uid in order_data:
         del order_data[uid]
 
-    await q.message.reply_text("Order cancelled")
+    await q.message.reply_text("❌ Order cancelled")
 
 # ---------------- SCREENSHOT ---------------- #
 
@@ -293,26 +348,26 @@ async def photo(update,context):
     if uid not in fund_stage:
         return
 
-    if fund_stage[uid]!="screenshot":
+    if fund_stage.get(uid)!="screenshot":
         return
 
     amount=fund_data[uid]["amount"]
 
     kb=[
         [
-            InlineKeyboardButton("Approve",callback_data=f"payok_{uid}_{amount}"),
-            InlineKeyboardButton("Reject",callback_data=f"payno_{uid}")
+            InlineKeyboardButton("✅ Approve",callback_data=f"payok_{uid}_{amount}"),
+            InlineKeyboardButton("❌ Reject",callback_data=f"payno_{uid}")
         ]
     ]
 
     await context.bot.send_photo(
         ADMIN_ID,
         update.message.photo[-1].file_id,
-        caption=f"Payment Request\nUser : {uid}\nAmount : {amount}",
+        caption=f"💳 Payment Request\n\nUser : {uid}\nAmount : ₹{amount}",
         reply_markup=InlineKeyboardMarkup(kb)
     )
 
-    await update.message.reply_text("Payment sent for approval")
+    await update.message.reply_text("✅ Sent to admin for approval")
 
     del fund_stage[uid]
     del fund_data[uid]
@@ -333,7 +388,21 @@ async def payok(update,context):
 
     set_balance(uid,bal+amount)
 
-    await context.bot.send_message(uid,f"Payment Approved\n₹{amount} added")
+    await context.bot.send_message(
+        uid,
+        f"✅ Payment approved\n₹{amount} added"
+    )
+
+# ---------------- REJECT ---------------- #
+
+async def payno(update,context):
+
+    q=update.callback_query
+    await q.answer()
+
+    uid=int(q.data.split("_")[1])
+
+    await context.bot.send_message(uid,"❌ Payment rejected")
 
 # ---------------- ORDERS ---------------- #
 
@@ -345,83 +414,26 @@ async def orders(update,context):
     rows=cur.fetchall()
 
     if not rows:
-        await update.message.reply_text("No orders yet")
+
+        await update.message.reply_text("📭 No orders yet")
         return
 
-    text="Your Orders\n\n"
+    text="📦 *Your Orders*\n\n"
 
     for r in rows:
 
         text+=f"{r[0]} | {r[1]} | ₹{r[2]}\n"
 
-    await update.message.reply_text(text)
+    await update.message.reply_text(
+        text,
+        parse_mode="Markdown"
+    )
 
-# ---------------- ADMIN COMMANDS ---------------- #
+# ---------------- ERROR HANDLER ---------------- #
 
-async def addbalance(update,context):
+async def error_handler(update,context):
 
-    if update.effective_user.id!=ADMIN_ID:
-        return
-
-    uid=int(context.args[0])
-    amt=float(context.args[1])
-
-    bal=get_balance(uid)
-
-    set_balance(uid,bal+amt)
-
-    await update.message.reply_text("Balance added")
-
-async def removebalance(update,context):
-
-    if update.effective_user.id!=ADMIN_ID:
-        return
-
-    uid=int(context.args[0])
-    amt=float(context.args[1])
-
-    bal=get_balance(uid)
-
-    set_balance(uid,bal-amt)
-
-    await update.message.reply_text("Balance removed")
-
-async def users(update,context):
-
-    cur.execute("SELECT COUNT(*) FROM users")
-    c=cur.fetchone()[0]
-
-    await update.message.reply_text(f"Users : {c}")
-
-async def orders_admin(update,context):
-
-    cur.execute("SELECT COUNT(*) FROM orders")
-    c=cur.fetchone()[0]
-
-    await update.message.reply_text(f"Orders : {c}")
-
-async def revenue(update,context):
-
-    cur.execute("SELECT SUM(price) FROM orders")
-    r=cur.fetchone()[0]
-
-    await update.message.reply_text(f"Revenue ₹{r}")
-
-async def broadcast(update,context):
-
-    if update.effective_user.id!=ADMIN_ID:
-        return
-
-    msg=" ".join(context.args)
-
-    cur.execute("SELECT id FROM users")
-
-    for u in cur.fetchall():
-
-        try:
-            await context.bot.send_message(u[0],msg)
-        except:
-            pass
+    print(context.error)
 
 # ---------------- MAIN ---------------- #
 
@@ -430,20 +442,17 @@ def main():
     application=Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start",start))
-    application.add_handler(CommandHandler("addbalance",addbalance))
-    application.add_handler(CommandHandler("removebalance",removebalance))
-    application.add_handler(CommandHandler("users",users))
-    application.add_handler(CommandHandler("orders",orders_admin))
-    application.add_handler(CommandHandler("revenue",revenue))
-    application.add_handler(CommandHandler("broadcast",broadcast))
 
     application.add_handler(CallbackQueryHandler(select_service,pattern="srv_"))
     application.add_handler(CallbackQueryHandler(confirm,pattern="confirm"))
     application.add_handler(CallbackQueryHandler(cancel,pattern="cancel"))
     application.add_handler(CallbackQueryHandler(payok,pattern="payok_"))
+    application.add_handler(CallbackQueryHandler(payno,pattern="payno_"))
 
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,text_handler))
     application.add_handler(MessageHandler(filters.PHOTO,photo))
+
+    application.add_error_handler(error_handler)
 
     threading.Thread(target=run).start()
 
@@ -451,3 +460,4 @@ def main():
 
 if __name__=="__main__":
     main()
+
